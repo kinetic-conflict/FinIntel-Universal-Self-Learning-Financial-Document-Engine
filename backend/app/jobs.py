@@ -6,8 +6,10 @@ def create_job(job_id: str, filename: str, path: str):
         "job_id": job_id,
         "filename": filename,
         "path": path,
-        "status": "QUEUED"
+        "status": "QUEUED",
+        "result": None
     }
+
 
 def get_job(job_id: str):
     return JOBS.get(job_id)
@@ -15,3 +17,8 @@ def get_job(job_id: str):
 def update_job_status(job_id: str, status: str):
     if job_id in JOBS:
         JOBS[job_id]["status"] = status
+
+def set_job_result(job_id: str, result: dict):
+    if job_id in JOBS:
+        JOBS[job_id]["result"] = result
+

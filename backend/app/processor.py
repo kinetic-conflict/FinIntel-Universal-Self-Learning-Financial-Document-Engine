@@ -1,14 +1,19 @@
 import time
-from app.jobs import update_job_status
+from app.jobs import update_job_status, set_job_result
 
 def process_document(job_id: str):
-    """
-    Simulates document processing.
-    Later this will do OCR, extraction, validation.
-    """
     update_job_status(job_id, "RUNNING")
 
-    # simulate heavy processing
-    time.sleep(5)
+    # simulate processing time
+    time.sleep(3)
 
+    # mock Challenge-2 knowledge object
+    result = {
+        "doc_type": "unknown",
+        "entities": {},
+        "tables": [],
+        "validation_status": "NEEDS_REVIEW"
+    }
+
+    set_job_result(job_id, result)
     update_job_status(job_id, "DONE")
