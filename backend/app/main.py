@@ -1,11 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
+import uuid
 
-# Create the backend application
+from app.storage import save_file
+
 app = FastAPI()
 
-# Home route (just to check server is alive)
 @app.get("/")
 def home():
+    return {"message": "FinIntel backend is running"}
+
+@app.post("/documents")
+async def upload_document(file: UploadFile = File(...)):
+    """
+    Upload a financial document (PDF / image).
+    """
+    contents = await file.read()
+
+    job_id = uuid.uuid4().hex
+    saved_path = save_file(contents, file.filename)
+
     return {
-        "message": "FinIntel backend is running"
+        "job_id": job_id,
+        "filename": file.filename,
+        "saved_path": saved_path
     }
