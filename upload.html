@@ -420,9 +420,11 @@
           <div class="drop-icon">⬆</div>
           <div class="drop-main">Drag & drop your files</div>
           <div class="drop-sub">or click to browse from your device</div>
-          <button type="button" class="browse-btn">Browse files</button>
+          <button type="button" class="browse-btn">Upload</button>
           <input id="file-input" type="file" multiple />
         </label>
+        
+        <script src="script.js"></script>
 
         <!-- Extra fields -->
         <div class="fields-row">
@@ -460,6 +462,31 @@
         <div class="cta-row">
           <button type="button" class="ghost-btn">Clear list</button>
            <a href="review.html" class="button-link">Start Analysis</a>
+           <input type="file" id="fileInput">
+
+<script>
+async function uploadFile() {
+    const file = document.getElementById("fileInput").files[0];
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("http://127.0.0.1:8000/documents", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+    console.log(data);
+
+    // Save job_id for next page
+    localStorage.setItem("job_id", data.job_id);
+
+    // go to review page
+    window.location.href = "review.html";
+}
+</script>
+
         </div>
       </form>
     </div>
