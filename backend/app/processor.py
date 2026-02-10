@@ -1,3 +1,4 @@
+# backend/app/processor.py
 from openpyxl import load_workbook
 from datetime import datetime, date
 from decimal import Decimal
@@ -5,23 +6,18 @@ from decimal import Decimal
 from app.jobs import update_job_status, set_job_result, get_job
 from app.client import call_ocr_service, call_validation_service
 
-
 def guess_doc_type(filename: str) -> str:
     name = filename.lower()
-
     if "bank" in name or "statement" in name:
         return "bank_statement"
     if "payslip" in name or "salary" in name:
         return "payslip"
     if "invoice" in name or "bill" in name:
         return "invoice"
-
     return "unknown"
-
 
 def is_excel(filename: str) -> bool:
     return filename.lower().endswith(".xlsx")
-
 
 def make_json_safe(value):
     if isinstance(value, (datetime, date)):
@@ -30,13 +26,11 @@ def make_json_safe(value):
         return float(value)
     return value
 
-
 def excel_to_knowledge(excel_path: str) -> dict:
     wb = load_workbook(excel_path, data_only=True)
     sheet = wb.active
 
     rows = list(sheet.iter_rows(values_only=True))
-
     if not rows or len(rows) < 2:
         return {"rows": []}
 
@@ -53,7 +47,6 @@ def excel_to_knowledge(excel_path: str) -> dict:
 
     return {"rows": data_rows}
 
-
 def process_document(job_id: str):
     update_job_status(job_id, "RUNNING")
 
@@ -66,36 +59,29 @@ def process_document(job_id: str):
 
         filename = job["filename"]
         path = job["path"]
-
         doc_type = guess_doc_type(filename)
 
+        # Build knowledge object
         if is_excel(filename):
             extracted = excel_to_knowledge(path)
-
             knowledge_object = {
                 "source": "excel",
                 "doc_type": doc_type,
                 "entities": extracted,
                 "tables": [],
-                "metadata": {
-                    "filename": filename,
-                    "job_id": job_id
-                }
+                "metadata": {"filename": filename, "job_id": job_id}
             }
         else:
             ocr_result = call_ocr_service(path)
-
             knowledge_object = {
                 "source": "ocr",
                 "doc_type": doc_type,
                 "entities": ocr_result.get("entities", {}),
                 "tables": ocr_result.get("tables", []),
-                "metadata": {
-                    "filename": filename,
-                    "job_id": job_id
-                }
+                "metadata": {"filename": filename, "job_id": job_id}
             }
 
+        # Validate (client already has fallback)
         validation_result = call_validation_service(knowledge_object)
 
         result = {

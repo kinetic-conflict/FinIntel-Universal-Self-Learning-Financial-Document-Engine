@@ -1,8 +1,8 @@
+# backend/app/storage.py
 import os
 import uuid
 
 DATA_DIR = "data"
-
 
 def save_file(file_bytes: bytes, original_filename: str) -> str:
     os.makedirs(DATA_DIR, exist_ok=True)
