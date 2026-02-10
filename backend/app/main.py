@@ -5,13 +5,19 @@ import uuid
 from app.storage import save_file
 from app.jobs import create_job, get_job
 from app.processor import process_document
+from app.db import init_db
 
 app = FastAPI()
 
-# ✅ Allow frontend to call backend
+# ✅ DB init so jobs table exists
+@app.on_event("startup")
+def startup():
+    init_db()
+
+# ✅ Allow frontend to call backend (Option 1)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # for demo — allow all
+    allow_origins=["*"],   # hackathon demo
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,13 +40,9 @@ async def upload_document(
     saved_path = save_file(contents, file.filename)
 
     create_job(job_id, file.filename, saved_path)
-
     background_tasks.add_task(process_document, job_id)
 
-    return {
-        "job_id": job_id,
-        "status": "QUEUED"
-    }
+    return {"job_id": job_id, "status": "QUEUED"}
 
 
 @app.get("/jobs/{job_id}")
