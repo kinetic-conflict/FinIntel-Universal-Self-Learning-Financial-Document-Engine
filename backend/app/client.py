@@ -1,9 +1,9 @@
-# backend/app/client.py
 import os
 import requests
 
 OCR_URL = os.getenv("OCR_URL", "http://127.0.0.1:9001/ocr")
 VAL_URL = os.getenv("VAL_URL", "http://127.0.0.1:9002/validate")
+
 
 def call_ocr_service(file_path: str) -> dict:
     try:
@@ -13,8 +13,8 @@ def call_ocr_service(file_path: str) -> dict:
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        # fallback
         return {"error": str(e), "entities": {}, "tables": []}
+
 
 def call_validation_service(knowledge_object: dict) -> dict:
     try:
@@ -22,7 +22,6 @@ def call_validation_service(knowledge_object: dict) -> dict:
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        # fallback
         return {
             "error": str(e),
             "totalChecks": 0,
@@ -33,6 +32,8 @@ def call_validation_service(knowledge_object: dict) -> dict:
                 "type": "error",
                 "title": "Validation service not reachable",
                 "details": str(e),
-                "documents": [knowledge_object.get("metadata", {}).get("filename", "unknown")]
+                "documents": [
+                    knowledge_object.get("metadata", {}).get("filename", "unknown")
+                ]
             }]
         }
