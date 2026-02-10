@@ -1,4 +1,3 @@
-# backend/app/db.py
 import os
 import sqlite3
 

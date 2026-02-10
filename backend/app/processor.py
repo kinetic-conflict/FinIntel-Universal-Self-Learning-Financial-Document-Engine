@@ -1,10 +1,9 @@
-# backend/app/processor.py
 from openpyxl import load_workbook
 from datetime import datetime, date
 from decimal import Decimal
 
 from app.jobs import update_job_status, set_job_result, get_job
-from app.client import call_ocr_service, call_validation_service
+
 
 def guess_doc_type(filename: str) -> str:
     name = filename.lower()
@@ -16,8 +15,10 @@ def guess_doc_type(filename: str) -> str:
         return "invoice"
     return "unknown"
 
+
 def is_excel(filename: str) -> bool:
     return filename.lower().endswith(".xlsx")
+
 
 def make_json_safe(value):
     if isinstance(value, (datetime, date)):
@@ -26,26 +27,28 @@ def make_json_safe(value):
         return float(value)
     return value
 
-def excel_to_knowledge(excel_path: str) -> dict:
+
+def excel_to_rows(excel_path: str):
     wb = load_workbook(excel_path, data_only=True)
     sheet = wb.active
 
     rows = list(sheet.iter_rows(values_only=True))
     if not rows or len(rows) < 2:
-        return {"rows": []}
+        return []
 
     headers = [str(h).strip() if h else "" for h in rows[0]]
 
     data_rows = []
-    for row in rows[1:]:
+    for r in rows[1:]:
         record = {}
         for i, header in enumerate(headers):
             key = header if header else f"col_{i}"
-            value = row[i] if i < len(row) else None
-            record[key] = make_json_safe(value)
+            val = r[i] if i < len(r) else None
+            record[key] = make_json_safe(val)
         data_rows.append(record)
 
-    return {"rows": data_rows}
+    return data_rows
+
 
 def process_document(job_id: str):
     update_job_status(job_id, "RUNNING")
@@ -59,39 +62,28 @@ def process_document(job_id: str):
 
         filename = job["filename"]
         path = job["path"]
+
         doc_type = guess_doc_type(filename)
 
-        # Build knowledge object
         if is_excel(filename):
-            extracted = excel_to_knowledge(path)
-            knowledge_object = {
-                "source": "excel",
+            rows = excel_to_rows(path)
+            result = {
                 "doc_type": doc_type,
-                "entities": extracted,
+                "source": "excel",
+                "entities": {"rows": rows},
                 "tables": [],
-                "metadata": {"filename": filename, "job_id": job_id}
+                "metadata": {"filename": filename, "job_id": job_id},
             }
         else:
-            ocr_result = call_ocr_service(path)
-            knowledge_object = {
-                "source": "ocr",
+            # If non-excel file uploaded, just store info (no OCR yet)
+            result = {
                 "doc_type": doc_type,
-                "entities": ocr_result.get("entities", {}),
-                "tables": ocr_result.get("tables", []),
-                "metadata": {"filename": filename, "job_id": job_id}
+                "source": "file",
+                "entities": {},
+                "tables": [],
+                "metadata": {"filename": filename, "job_id": job_id},
+                "note": "Non-Excel file uploaded. OCR not enabled in this minimal backend run.",
             }
-
-        # Validate (client already has fallback)
-        validation_result = call_validation_service(knowledge_object)
-
-        result = {
-            "doc_type": doc_type,
-            "source": knowledge_object["source"],
-            "entities": knowledge_object["entities"],
-            "tables": knowledge_object["tables"],
-            "validation": validation_result,
-            "metadata": knowledge_object["metadata"]
-        }
 
         set_job_result(job_id, result)
         update_job_status(job_id, "DONE")

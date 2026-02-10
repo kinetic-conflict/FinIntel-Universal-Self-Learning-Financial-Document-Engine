@@ -1,4 +1,3 @@
-# backend/app/storage.py
 import os
 import uuid
 
