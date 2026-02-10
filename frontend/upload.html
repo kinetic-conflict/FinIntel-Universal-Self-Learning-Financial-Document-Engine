@@ -380,6 +380,46 @@
   </style>
 </head>
 <body>
+
+  <script>
+    const API_BASE = ""; // SAME ORIGIN
+    
+    const fileInput = document.getElementById("file-input");
+    const startBtn = document.getElementById("start-analysis");
+    
+    startBtn.addEventListener("click", async () => {
+      if (!fileInput.files.length) {
+        alert("Please select a file");
+        return;
+      }
+    
+      const form = new FormData();
+      form.append("file", fileInput.files[0]);
+    
+      try {
+        startBtn.disabled = true;
+        startBtn.innerText = "Uploading...";
+    
+        const res = await fetch("/documents", {
+          method: "POST",
+          body: form
+        });
+    
+        if (!res.ok) throw new Error("Upload failed");
+    
+        const data = await res.json();
+        localStorage.setItem("finintel_job_id", data.job_id);
+    
+        window.location.href = "/review";
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        startBtn.disabled = false;
+        startBtn.innerText = "Start Analysis";
+      }
+    });
+    </script>
+
 <div class="page">
 
   <!-- Centered title instead of top bar -->
