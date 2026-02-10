@@ -1,25 +1,25 @@
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
+
+
+class KnowledgeObject(BaseModel):
+    source: str = "excel"
+    doc_type: str = "unknown"
+    entities: Dict[str, Any] = Field(default_factory=dict)
+    tables: List[Any] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Finding(BaseModel):
-    type: str  # "success" | "warning" | "error"
+    type: str
     title: str
     details: str
-    documents: List[str]
+    documents: List[str] = Field(default_factory=list)
 
 
-class ValidationResponse(BaseModel):
+class ValidationResult(BaseModel):
     totalChecks: int
     passed: int
     warnings: int
     errors: int
-    findings: List[Finding]
-
-
-class KnowledgeObject(BaseModel):
-    source: str                      # "excel" or "ocr"
-    doc_type: str                    # "bank_statement" / "payslip" / "invoice" / "unknown"
-    entities: Dict[str, Any]         # your extracted entities, excel rows etc
-    tables: List[Any] = []           # optional
-    metadata: Dict[str, Any] = {}    # filename, job_id, etc
+    findings: List[Finding] = Field(default_factory=list)
