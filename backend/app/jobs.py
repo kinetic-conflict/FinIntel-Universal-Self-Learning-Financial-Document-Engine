@@ -1,87 +1,71 @@
-import sqlite3
-import json
-from pathlib import Path
+from contextlib import asynccontextmanager
 
-DB_PATH = Path("data/jobs.db")
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
+import uuid
 
-
-def init_db():
-    DB_PATH.parent.mkdir(exist_ok=True)
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            job_id TEXT PRIMARY KEY,
-            filename TEXT,
-            path TEXT,
-            status TEXT,
-            result TEXT
-        )
-    """)
-
-    conn.commit()
-    conn.close()
+from app.storage import save_file
+from app.jobs import create_job, get_job
+from app.processor import process_document
+from app.db import init_db
 
 
-def create_job(job_id: str, filename: str, path: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO jobs (job_id, filename, path, status, result)
-        VALUES (?, ?, ?, ?, ?)
-    """, (job_id, filename, path, "QUEUED", None))
-
-    conn.commit()
-    conn.close()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Runs once when the server starts, and once when it shuts down.
+    Replaces deprecated @app.on_event("startup").
+    """
+    init_db()
+    yield
+    # If you ever add cleanup (closing DB, etc), do it after yield.
 
 
-def get_job(job_id: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT job_id, filename, path, status, result
-        FROM jobs WHERE job_id = ?
-    """, (job_id,))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
-        return None
-
-    return {
-        "job_id": row[0],
-        "filename": row[1],
-        "path": row[2],
-        "status": row[3],
-        "result": json.loads(row[4]) if row[4] else None
-    }
+app = FastAPI(lifespan=lifespan)
 
 
-def update_job_status(job_id: str, status: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE jobs SET status = ? WHERE job_id = ?
-    """, (status, job_id))
-
-    conn.commit()
-    conn.close()
+@app.get("/")
+def home():
+    return {"message": "FinIntel backend is running"}
 
 
-def set_job_result(job_id: str, result: dict):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+@app.post("/upload")
+async def upload_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    """
+    1) Save uploaded file
+    2) Create a job
+    3) Start background processing
+    """
+    try:
+        job_id = str(uuid.uuid4())
 
-    cursor.execute("""
-        UPDATE jobs SET result = ?, status = 'DONE'
-        WHERE job_id = ?
-    """, (json.dumps(result), job_id))
+        # save_file should return (filename, path) OR a dict with these
+        saved = await save_file(file) if callable(getattr(save_file, "__await__", None)) else save_file(file)
 
-    conn.commit()
-    conn.close()
+        # Support both return styles: tuple or dict
+        if isinstance(saved, (tuple, list)) and len(saved) >= 2:
+            filename, path = saved[0], saved[1]
+        elif isinstance(saved, dict) and "filename" in saved and "path" in saved:
+            filename, path = saved["filename"], saved["path"]
+        else:
+            raise ValueError("save_file() must return (filename, path) or {'filename':..., 'path':...}")
+
+        create_job(job_id=job_id, filename=filename, path=path)
+
+        # Run processing in background
+        background_tasks.add_task(process_document, job_id)
+
+        return {"job_id": job_id, "status": "queued"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+
+
+@app.get("/jobs/{job_id}")
+def job_status(job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
