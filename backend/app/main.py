@@ -1,13 +1,16 @@
-# backend/app/main.py
-
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 import uuid
 
 from app.storage import save_file
-from app.jobs import create_job, get_job
+from app.jobs import create_job, get_job, init_db
 from app.processor import process_document
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 @app.get("/")
@@ -25,10 +28,8 @@ async def upload_document(
     job_id = uuid.uuid4().hex
     saved_path = save_file(contents, file.filename)
 
-    # create a tracked job
     create_job(job_id, file.filename, saved_path)
 
-    # process in background (RUNNING -> DONE)
     background_tasks.add_task(process_document, job_id)
 
     return {
